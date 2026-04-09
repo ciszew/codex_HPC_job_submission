@@ -1,7 +1,7 @@
 # Standard Operating Procedure: MCMICRO SLURM Automation Pipeline (V048)
 
 ## 1. Introduction
-The `create_codex_slurm_submission_V048.py` script is a master automation wrapper designed to deploy the MCMICRO pipeline on a SLURM-managed High-Performance Computing (HPC) cluster. 
+The `create_codex_slurm_submission_V048.py` script is a master automation wrapper designed to deploy modular components (Ashlar, Background Subtraction, Deepcell Segmentation, and Quantification) , some of them part of the MCMICRO pipeline on a SLURM-managed High-Performance Computing (HPC) cluster Randi provided by CRI at University of Chicago. 
 
 Version 48 introduces a major architectural upgrade: **Dynamic Marker Name Resolution**. Instead of relying on hardcoded channel indices—which frequently break when upstream channels are dropped—the script accepts exact marker names (e.g., `UV_high`, `CD45_Atto550`). It simulates both the Ashlar drop phase (`ashlar=skip`) and the Background Subtraction drop phase (`remove=TRUE`) to dynamically calculate the precise 0-based indices for downstream segmentation and QC overlay generation.
 
