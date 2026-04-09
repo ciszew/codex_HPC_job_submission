@@ -1,0 +1,17 @@
+# Ignore Data Files
+*.ims
+*.ome.tif
+*.tiff
+*.csv
+*.h5
+*.xml
+
+# Ignore System and Python files
+__pycache__/
+*.pyc
+.DS_Store
+
+# Ignore SLURM logs
+*.out
+*.err
+*.txt
