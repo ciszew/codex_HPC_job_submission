@@ -399,7 +399,18 @@ if __name__ == "__main__":
     scratch_run_dir = os.path.join(SCRATCH_BASE_DIR, run_name)
     staged_scripts_dir = os.path.join(scratch_run_dir, "scripts")
     
-    print(f"\n--- MCMICRO SUBMISSION V48 ---\nScratch Dir: {scratch_run_dir}")
+    print("\n" + "="*60)
+    print("--- MCMICRO SUBMISSION SUMMARY (V48) ---")
+    print("="*60)
+    print(f"Data Directory:         {source_data_dir}")
+    print(f"Run Name:               {run_name}")
+    print(f"Total Cycles/Fields:    {num_cores}")
+    print(f"Total Raw Data Size:    {total_gb:.2f} GB")
+    print(f"Scratch Directory:      {scratch_run_dir}")
+    print("\n--- Estimated Resources per Job ---")
+    for job_name, res in resources.items():
+        print(f"  - {job_name:<15} Time={res['time']}, Mem={res['mem']}, CPUs={res['cpu']}")
+    print("="*60 + "\n")
     
     if not args.dry_run:
         os.makedirs(scratch_run_dir, exist_ok=True)
