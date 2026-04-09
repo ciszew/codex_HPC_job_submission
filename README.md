@@ -1,7 +1,7 @@
 # Standard Operating Procedure: MCMICRO SLURM Automation Pipeline (V048)
 
 ## 1. Introduction
-The `create_codex_slurm_submission_V048.py` script is a master automation wrapper designed to deploy modular components (Ashlar, Background Subtraction, Deepcell Segmentation, and Quantification) , some of them part of the MCMICRO pipeline on a SLURM-managed High-Performance Computing (HPC) cluster Randi provided by CRI at University of Chicago. 
+The `create_codex_slurm_submission_V048.py` script is a master automation wrapper designed to deploy modular components (Ashlar, Background Subtraction, Deepcell Segmentation, and Quantification) , some of them part of the MCMICRO pipeline on a SLURM-managed High-Performance Computing (HPC) cluster Randi provided by CRI at University of Chicago. This pipeline was created for the Codex spatial proteomics platform at HDID core facility at the University of Chicago (https://voices.uchicago.edu/hdid/codex-platform/).
 
 Version 48 introduces a major architectural upgrade: **Dynamic Marker Name Resolution**. Instead of relying on hardcoded channel indices—which frequently break when upstream channels are dropped—the script accepts exact marker names (e.g., `UV_high`, `CD45_Atto550`). It simulates both the Ashlar drop phase (`ashlar=skip`) and the Background Subtraction drop phase (`remove=TRUE`) to dynamically calculate the precise 0-based indices for downstream segmentation and QC overlay generation.
 
@@ -15,13 +15,14 @@ Before executing the master script, ensure the following environment constraints
 
 ### A. Input Data Requirements
 The target raw data directory must contain:
-* **Raw Image Tiles:** `.ims` or `.ome.tif` files organized into field-of-view subdirectories.
+* **Raw Image Tiles:** `.ims` or `.ome.tif` files organized into per cycle subdirectories.
 * **XML Metadata:** At least one `.xml` file containing voxel dimensions and stack layouts.
 * **Marker Configuration (`markers_ashlar.csv`):** This file is strictly required in the root of the data directory. It must contain `marker_name`, `ashlar`, and `remove` columns to dictate channel inclusion.
 
 ### B. HPC Environment & Helper Scripts
 The script expects specific Python scripts and Conda environments to exist on the shared HPC drive:
-* **Conda Environments:** * `ashlar_group` (Stitching)
+* **Conda Environments:** 
+  * `ashlar_group` (Stitching)
   * `deepcell` (QC Overlays)
   * `qc` (HTML Reports)
 * **QC Helper Scripts (`QC_SCRIPTS_DIR`):**
