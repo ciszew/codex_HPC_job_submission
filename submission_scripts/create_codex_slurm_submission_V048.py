@@ -344,8 +344,8 @@ def get_params_analysis_yml(is_tma, compartment, nuc_idx, memb_indices):
     nuc_1b = nuc_idx + 1
     all_channels = [str(nuc_1b)] + [str(i + 1) for i in memb_indices]
     
-    # Format strictly as a YAML list: [1, 13, 15]
-    yaml_list = "[" + ", ".join(all_channels) + "]"
+    # Format strictly as a space-separated string enclosed in quotes: '1 13 15'
+    yaml_list = "'" + " ".join(all_channels) + "'"
 
     return f"""
 workflow:
