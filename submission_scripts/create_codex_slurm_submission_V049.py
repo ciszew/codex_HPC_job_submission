@@ -247,6 +247,11 @@ def estimate_resources(total_gb, num_cores, is_tma):
     est_ashlar_hours = (total_gb * ashlar_hours_per_gb) * 1.5 + 2
     est_ashlar_hours = _clamp_wall_time(est_ashlar_hours, "ashlar")
 
+    # Dynamic scaling for Job 4 (Preprocess)
+    est_prep_mem = max(48, int(32 + (total_gb * 0.02)))
+    est_prep_hours = max(4, int(3 + (total_gb * 0.003)))
+    est_prep_hours = _clamp_wall_time(est_prep_hours, "preprocess")
+
     if is_tma:
         # TMAs are cropped into small pieces, memory footprint is low
         est_segmentation_hours = (num_cores * 0.8) + 3
@@ -265,7 +270,7 @@ def estimate_resources(total_gb, num_cores, is_tma):
         "1_staging":     {"time": "04:00:00", "mem": "8G", "cpu": "1"},
         "2_renaming":    {"time": "01:00:00", "mem": "8G", "cpu": "1"},
         "3_ashlar":      {"time": format_slurm_time(est_ashlar_hours), "mem": "64G", "cpu": "4"},
-        "4_preprocess":  {"time": "04:00:00", "mem": "48G", "cpu": "4"},
+        "4_preprocess":  {"time": format_slurm_time(est_prep_hours), "mem": f"{est_prep_mem}G", "cpu": "4"},
         "5_segment":     {"time": format_slurm_time(est_segmentation_hours), "mem": seg_mem, "cpu": "4"},
         "6_quant_merge": {"time": format_slurm_time(est_quant_hours), "mem": "64G", "cpu": "4"},
         "7_archive":     {"time": "04:00:00", "mem": "8G", "cpu": "1"}
