@@ -36,36 +36,54 @@ from datetime import datetime
 import xml.etree.ElementTree as ET
 
 # ==============================================================================
-# --- SCRIPT DEFAULTS (Priority 4 — lowest) ---
+# --- USER-CONFIGURABLE VARIABLES ---
 # ==============================================================================
-_DEFAULTS = {
-    "scratch_base_dir": "/scratch/cciszews/nextflow_runs/",
-    "conda_base_path": "/gpfs/data/hdid-share/conda",
-    "qc_scripts_dir": "/gpfs/data/hdid-share/Codex/HDID/scripts/current_working_scripts/",
-}
 
-# --- Env-var-to-config key mapping (Priority 2) ---
-_ENV_MAP = {
-    "CODEX_SCRATCH_DIR": "scratch_base_dir",
-    "CODEX_CONDA_BASE": "conda_base_path",
-    "CODEX_QC_SCRIPTS_DIR": "qc_scripts_dir",
-}
-
+# ------------------------------------------------------------------------------
+# 1. PIPELINE MODE & MICROSCOPE SETTINGS
+# ------------------------------------------------------------------------------
+# IS_TMA_WORKFLOW: Set to True for Tissue Microarrays, False for Whole Slide Images (WSI).
+# This dynamically adjusts Nextflow routing, DeepCell QC flags, and Slurm resource math.
 IS_TMA_WORKFLOW = False
+
+# IMAGE_MPP: Microns per pixel. Critical for DeepCell/Mesmer segmentation scale.
+# (e.g., 0.32 for 40x magnification, 0.50 for standard 20x).
 IMAGE_MPP = 0.32
+
+# ARCSINH_COFACTOR: Used for arcsinh data transformation in the final QC reports. 
+# Standard Codex default is 5.
 ARCSINH_COFACTOR = 5
 
-# Set Segmentation Channels by EXACT MARKER NAME (as written in markers_ashlar.csv)
+# ------------------------------------------------------------------------------
+# 2. MARKER CONFIGURATION
+# ------------------------------------------------------------------------------
+# IMPORTANT: These names must EXACTLY match the 'marker_name' column in your 
+# markers_ashlar.csv file (case-insensitive). The script will automatically calculate 
+# the correct indices by dropping 'ashlar=skip' and 'remove=true' channels.
+
+# NUC_MARKER_NAME: The exact string name of the nuclear marker (e.g., "DAPI", "UV_high").
 NUC_MARKER_NAME = "UV_high"
+
+# MEMBRANE_MARKER_NAMES: Space-separated string of membrane/cytoplasm markers 
+# used for whole-cell segmentation. 
+# Example: "CD45_Atto550 PanCK_AF750 CD3e_AF488"
 MEMBRANE_MARKER_NAMES = "CD45_Atto550 PanCK_AF750"
 
-ASHLAR_OVERLAP = 0.1
-ASHLAR_LAYOUT = 'snake'
-ASHLAR_DIRECTION = 'vertical'
-ASHLAR_MAX_SHIFT = 30
-ASHLAR_FILTER_SIGMA = 2
+# ------------------------------------------------------------------------------
+# 3. ASHLAR STITCHING PARAMETERS
+# ------------------------------------------------------------------------------
+ASHLAR_OVERLAP = 0.1          # Expected overlap between microscope tiles (10% = 0.1)
+ASHLAR_LAYOUT = 'snake'       # Tile acquisition layout ('snake' or 'raster')
+ASHLAR_DIRECTION = 'vertical' # Acquisition direction ('vertical' or 'horizontal')
+ASHLAR_MAX_SHIFT = 30         # Maximum allowed shift in pixels during alignment
+ASHLAR_FILTER_SIGMA = 2       # Smoothing filter for noisy channels (reduces stitch errors)
 
-MAX_WALL_HOURS = 168  # 7 days — typical Slurm partition maximum
+# ------------------------------------------------------------------------------
+# 4. HPC RESOURCE LIMITS
+# ------------------------------------------------------------------------------
+# MAX_WALL_HOURS: The absolute maximum time limit for your Slurm partition (168h = 7 days).
+# If dataset estimates exceed this, the script will clamp to this value and print a warning.
+MAX_WALL_HOURS = 168
 
 # ==============================================================================
 # --- CONFIGURATION RESOLUTION ---
@@ -502,7 +520,11 @@ def get_params_analysis_yml(is_tma, compartment, nuc_idx, memb_indices):
 
     # Recyze uses 1-based extraction logic
     nuc_1b = nuc_idx + 1
-    all_channels = [str(nuc_1b)] + [str(i + 1) for i in memb_indices]
+    
+    if compartment == 'nuclear':
+        all_channels = [str(nuc_1b)]
+    else:
+        all_channels = [str(nuc_1b)] + [str(i + 1) for i in memb_indices]
 
     # Format strictly as a space-separated string enclosed in quotes: '1 13 15'
     yaml_list = "'" + " ".join(all_channels) + "'"
@@ -695,6 +717,8 @@ if __name__ == "__main__":
         CONDA_BASE_PATH, QC_ENV_DEEPCELL, QC_ENV_REPORTS
     )
 
+    tma_flag = " --is-tma" if IS_TMA_WORKFLOW else ""
+
     job_scripts = {
         '1_staging': (
             generate_slurm_header('1_staging', resources['1_staging'])
@@ -733,12 +757,12 @@ if __name__ == "__main__":
             + 'module load go/1.20.1 openjdk/17.0.2 singularity/3.8.7 nextflow miniconda3\n'
             + 'nextflow run labsyspharm/mcmicro --in . -profile singularity -params-file params-wc.yml\n'
             + f'source activate "${{QC_ENV_DC}}"\n'
-            + f'bash ./scripts/run_overlay_qc.sh --base-dir . --nuc-channel {nuc_idx} --cyto-channel {cyto_idx} --overlay-script ./scripts/create_overlay_final.py --seg-base segmentation/mesmer --is-tma\n'
+            + f'bash ./scripts/run_overlay_qc.sh --base-dir . --nuc-channel {nuc_idx} --cyto-channel {cyto_idx} --overlay-script ./scripts/create_overlay_final.py --seg-base segmentation/mesmer{tma_flag}\n'
             + 'conda deactivate\n'
             + 'mv segmentation segmentation_wc; mv qc_overlays_segmentation-mesmer qc_overlays_wc\n'
             + 'nextflow run labsyspharm/mcmicro --in . -profile singularity -params-file params-nuc.yml\n'
             + f'source activate "${{QC_ENV_DC}}"\n'
-            + f'bash ./scripts/run_overlay_qc.sh --base-dir . --nuc-channel {nuc_idx} --cyto-channel {cyto_idx} --overlay-script ./scripts/create_overlay_final.py --seg-base segmentation/mesmer --is-tma\n'
+            + f'bash ./scripts/run_overlay_qc.sh --base-dir . --nuc-channel {nuc_idx} --cyto-channel {cyto_idx} --overlay-script ./scripts/create_overlay_final.py --seg-base segmentation/mesmer{tma_flag}\n'
             + 'conda deactivate\n'
             + 'for dir in segmentation/mesmer-*; do mv "$dir/cell.tif" "$dir/nuclear.tif" 2>/dev/null; done\n'
             + 'mv segmentation segmentation_nuc; mv qc_overlays_segmentation-mesmer qc_overlays_nuc\n'
