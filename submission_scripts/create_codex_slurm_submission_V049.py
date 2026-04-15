@@ -89,6 +89,20 @@ MAX_WALL_HOURS = 168
 # --- CONFIGURATION RESOLUTION ---
 # ==============================================================================
 
+# --- Script Defaults (Priority 4 — lowest) ---
+_DEFAULTS = {
+    "scratch_base_dir": "/scratch/cciszews/nextflow_runs/",
+    "conda_base_path": "/gpfs/data/hdid-share/conda",
+    "qc_scripts_dir": "/gpfs/data/hdid-share/Codex/HDID/scripts/current_working_scripts/",
+}
+
+# --- Env-var-to-config key mapping (Priority 2) ---
+_ENV_MAP = {
+    "CODEX_SCRATCH_DIR": "scratch_base_dir",
+    "CODEX_CONDA_BASE": "conda_base_path",
+    "CODEX_QC_SCRIPTS_DIR": "qc_scripts_dir",
+}
+
 def load_config(cli_args):
     """Resolve configuration with cascading priority: CLI > Env > File > Defaults."""
     # Priority 4: defaults
@@ -312,70 +326,55 @@ trap "echo '>>> Cleaning up monitor process PID $MONITOR_PID...'; kill $MONITOR_
 
 
 def generate_rename_script(path, dirs_to_rename_map, xml_path):
-    """Generate the renamer Python script with safe serialization."""
-    safe_path = repr(path)
-    safe_map = repr(json.dumps(dirs_to_rename_map))
-
     return f'''
-import os, re, json, statistics, shutil
+import os, re, statistics, shutil, json
 
-path = {safe_path}
-dirs_map = json.loads({safe_map})
+path = {repr(path)}
+dirs_map = json.loads({repr(json.dumps(dirs_to_rename_map))})
 
 for old, new in dirs_map.items():
-    old_path = os.path.join(path, old)
-    new_path = os.path.join(path, new)
-    try:
-        os.rename(old_path, new_path)
-    except OSError as e:
-        msg = f"ERROR: Failed to rename directory '{{old}}' -> '{{new}}': {{e}}"
-        print(msg, flush=True)
-        raise SystemExit(msg)
+    try: os.rename(os.path.join(path, old), os.path.join(path, new))
+    except OSError as e: raise RuntimeError(f"FATAL: Directory rename failed {{old}} -> {{new}}: {{e}}")
 
 all_cycles = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d)) and re.search(r'_\\d+_Field', d)]
-all_cycles.sort(key=lambda x: int(re.search(r'_(\\\\d+)_Field', x).group(1)))
+all_cycles.sort(key=lambda x: int(re.search(r'_(\\d+)_Field', x).group(1)))
 
 log_file = open(os.path.join(path, "QA_QC_Report.txt"), "w")
-log_file.write("--- Data Integrity Check ---\\\\n")
+log_file.write("--- Data Integrity Check ---\\n")
 
 for dir_name in all_cycles:
     dir_path = os.path.join(path, dir_name)
-
+    
     for f in os.listdir(dir_path):
-        match = re.search(r'_F(\\\\d+)(\\\\.ims|\\\\.ome\\\\.tif)', f, re.IGNORECASE)
-        if match:
+        match = re.search(r'_F(\\d+)(\\.ims|\\.ome\\.tif)', f, re.IGNORECASE)
+        if match: 
             new_name = f"F{{match.group(1)}}{{match.group(2)}}"
-            try:
-                os.rename(os.path.join(dir_path, f), os.path.join(dir_path, new_name))
-            except OSError as e:
-                msg = f"ERROR: Failed to rename file '{{f}}' -> '{{new_name}}' in {{dir_name}}: {{e}}"
-                log_file.write(msg + "\\\\n")
-                print(msg, flush=True)
-                raise SystemExit(msg)
-
+            try: os.rename(os.path.join(dir_path, f), os.path.join(dir_path, new_name))
+            except OSError as e: raise RuntimeError(f"FATAL: File rename failed {{f}} -> {{new_name}}: {{e}}")
+            
     files_in_dir = [f for f in os.listdir(dir_path) if f.startswith('F') and f.endswith('.ims')]
     if not files_in_dir: continue
-
+    
     file_sizes = [os.path.getsize(os.path.join(dir_path, f)) for f in files_in_dir]
     median_size = statistics.median(file_sizes)
-    threshold = median_size * 0.85
-
-    files_in_dir.sort(key=lambda x: int(re.search(r'F(\\\\d+)', x).group(1)))
-
+    threshold = median_size * 0.85 
+    
+    files_in_dir.sort(key=lambda x: int(re.search(r'F(\\d+)', x).group(1)))
+    
     for i, f_name in enumerate(files_in_dir):
         file_path = os.path.join(dir_path, f_name)
         size = os.path.getsize(file_path)
-
+        
         if size < threshold:
-            log_file.write(f"WARNING: Corrupted file detected: {{dir_name}}/{{f_name}} ({{size}} bytes. Median: {{median_size}})\\\\n")
+            log_file.write(f"WARNING: Corrupted file detected: {{dir_name}}/{{f_name}} ({{size}} bytes. Median: {{median_size}})\\n")
             replacement = None
             if i > 0 and os.path.getsize(os.path.join(dir_path, files_in_dir[i-1])) > threshold: replacement = files_in_dir[i-1]
             elif i < len(files_in_dir) - 1 and os.path.getsize(os.path.join(dir_path, files_in_dir[i+1])) > threshold: replacement = files_in_dir[i+1]
-
+                
             if replacement:
                 shutil.copy2(os.path.join(dir_path, replacement), file_path)
-                log_file.write(f"  -> Successfully patched by duplicating adjacent tile: {{replacement}}\\\\n")
-            else: log_file.write(f"  -> ERROR: Could not find healthy adjacent tile in this cycle.\\\\n")
+                log_file.write(f"  -> Successfully patched by duplicating adjacent tile: {{replacement}}\\n")
+            else: log_file.write(f"  -> ERROR: Could not find healthy adjacent tile in this cycle.\\n")
 
 log_file.close()
 '''
