@@ -52,8 +52,8 @@ import xml.etree.ElementTree as ET
 IS_TMA_WORKFLOW = False
 
 # IMAGE_MPP: Microns per pixel. Critical for DeepCell/Mesmer segmentation scale.
-# (e.g., 0.32 for 40x magnification, 0.50 for standard 20x).
-IMAGE_MPP = 0.32
+# (e.g., 0.16 for 40x magnification, 0.32 for standard 20x).
+IMAGE_MPP = 0.16
 
 # ARCSINH_COFACTOR: Used for arcsinh data transformation in the final QC reports. 
 # Standard Codex default is 5.
@@ -72,7 +72,7 @@ NUC_MARKER_NAME = "UV_high"
 # MEMBRANE_MARKER_NAMES: Space-separated string of membrane/cytoplasm markers 
 # used for whole-cell segmentation. 
 # Example: "CD45_Atto550 PanCK_AF750 CD3e_AF488"
-MEMBRANE_MARKER_NAMES = "CD45_Atto550 PanCK_AF750"
+MEMBRANE_MARKER_NAMES = "CD45_Atto550 PanCK_AF488"
 
 # ------------------------------------------------------------------------------
 # 3. ASHLAR STITCHING PARAMETERS
@@ -110,7 +110,7 @@ TRUE_WIDTH = 1979
 
 # --- Script Defaults (Priority 4 — lowest) ---
 _DEFAULTS = {
-    "scratch_base_dir": "/scratch/cciszews/nextflow_runs/",
+    "scratch_base_dir": "/scratch/cciszews/nextflow_runs/04142026/",
     "conda_base_path": "/gpfs/data/hdid-share/conda",
     "qc_scripts_dir": "/gpfs/data/hdid-share/Codex/HDID/scripts/current_working_scripts/",
 }
@@ -690,7 +690,7 @@ def submit_chain(slurm_paths, job_order):
             cmd.append(f"--dependency=afterok:{submitted_ids[-1]}")
         cmd.append(slurm_paths[job_key])
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
         if result.returncode != 0:
             print(f"FATAL: sbatch failed for {job_key}: {result.stderr.strip()}")
@@ -845,7 +845,7 @@ if __name__ == "__main__":
             generate_slurm_header('2_renaming', resources['2_renaming'])
             + path_block
             + 'module load go/1.20.1 miniconda3\n'
-            + f'source activate "${{CONDA_BASE}}/ashlar_group"\n'
+            + f'source activate "${{QC_ENV_DC}}"\n'
             + 'python "${SCRIPTS_DIR}/_renamer.py"\n'
         ),
         '3_ashlar': (
