@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================================================
-# MCMICRO Segmentation QC Overlay Generator (Dynamic Launcher V3)
+# MCMICRO Segmentation QC Overlay Generator (Dynamic Launcher V4)
 # =============================================================================
 #
 # Purpose:
@@ -12,13 +12,9 @@
 # =============================================================================
 
 # --- ARGUMENT PARSING ---
-# All configuration is provided via flags.
-
-# Set defaults
 IS_TMA=false
 CYTO_CHANNEL_CMD=""
 
-# Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --base-dir) BASE_DIR="$2"; shift ;;
@@ -37,20 +33,20 @@ done
 if [ "$IS_TMA" = true ]; then
     echo "--- Starting TMA Overlay Generation ---"
     DEARRAY_DIR="${BASE_DIR}/dearray"
-    OUTPUT_DIR="${BASE_DIR}/qc_overlays_${SEG_FOLDER_BASE//\//-}" # Creates a clean folder name like "qc_overlays_segmentation-mesmer"
+    OUTPUT_DIR="${BASE_DIR}/qc_overlays_${SEG_FOLDER_BASE//\//-}" 
 
     mkdir -p "$OUTPUT_DIR"
 
-    # Loop through all TIFF files in the dearray directory
     for image_file in ${DEARRAY_DIR}/*.tif*; do
         base_name=$(basename "$image_file")
         core_id=$(echo "$base_name" | cut -d'.' -f1)
         
-        # Construct the path to the corresponding mask file
+        # TMA Mesmer mask path
         mask_file="${BASE_DIR}/${SEG_FOLDER_BASE}-${core_id}/cell.tif"
         output_file="${OUTPUT_DIR}/${core_id}_overlay.ome.tif"
         
         if [ -f "$mask_file" ]; then
+            # CYTO_CHANNEL_CMD is unquoted here so Python receives it as distinct arguments if there are multiple indices
             CMD="python $OVERLAY_SCRIPT --image $image_file --mask $mask_file --output $output_file --nuclear-channel-index $NUC_CHANNEL $CYTO_CHANNEL_CMD"
             echo "Executing: $CMD"
             eval "$CMD"
@@ -59,14 +55,21 @@ if [ "$IS_TMA" = true ]; then
         fi
     done
     echo "--- TMA Overlay Generation Complete ---"
+    
 else
-    # This section is for a non-TMA, whole-slide workflow
     echo "--- Starting Whole Slide Overlay Generation ---"
-    # Find the first .ome.tif file in the background directory
+    
+    # 1. Find the stitched image
     IMAGE_FILE=$(find "${BASE_DIR}/background" -name "*.ome.tif" -print -quit)
-    MASK_FILE="${BASE_DIR}/${SEG_FOLDER_BASE}/cellmask.tif"
+    
+    # 2. Dynamically resolve the image base name (e.g., 'stitched_backsub')
+    BASE_NAME=$(basename "$IMAGE_FILE" .ome.tif)
+    
+    # 3. Construct the exact path MCMICRO uses for WSI masks
+    MASK_FILE="${BASE_DIR}/${SEG_FOLDER_BASE}-${BASE_NAME}/cell.tif"
+    
     OUTPUT_DIR="${BASE_DIR}/qc_overlays_${SEG_FOLDER_BASE//\//-}"
-    OUTPUT_FILE="${OUTPUT_DIR}/$(basename "$IMAGE_FILE" .ome.tif)_overlay.ome.tif"
+    OUTPUT_FILE="${OUTPUT_DIR}/${BASE_NAME}_overlay.ome.tif"
 
     mkdir -p "$OUTPUT_DIR"
     
