@@ -814,7 +814,7 @@ if __name__ == "__main__":
         return f"#!/bin/bash -l\n#SBATCH --job-name={job_key}\n#SBATCH --account=hdid-share\n#SBATCH --partition={partition}\n#SBATCH --time={res['time']}\n#SBATCH --cpus-per-task={res['cpu']}\n#SBATCH --mem={res['mem']}\n#SBATCH --output={job_key}.%J.out\n#SBATCH --error={job_key}.%J.err\n"
 
     # Grab the first membrane index for DeepCell QC overlays
-    cyto_idx = memb_indices[0] if len(memb_indices) > 0 else nuc_idx
+    cyto_idx_str = " ".join(map(str, memb_indices)) if len(memb_indices) > 0 else str(nuc_idx)
 
     # --- Build bash variable blocks for safe path interpolation ---
     def _path_vars_block(src, scratch, scripts, conda, qc_dc, qc_rpt):
@@ -874,12 +874,12 @@ if __name__ == "__main__":
             + 'module load go/1.20.1 openjdk/17.0.2 singularity/3.8.7 nextflow miniconda3\n'
             + 'nextflow run labsyspharm/mcmicro --in . -profile singularity -params-file params-wc.yml\n'
             + f'source activate "${{QC_ENV_DC}}"\n'
-            + f'bash ./scripts/run_overlay_qc.sh --base-dir . --nuc-channel {nuc_idx} --cyto-channel {cyto_idx} --overlay-script ./scripts/create_overlay_final.py --seg-base segmentation/mesmer{tma_flag}\n'
+            + f'bash ./scripts/run_overlay_qc.sh --base-dir . --nuc-channel {nuc_idx} --cyto-channel "{cyto_idx_str}"    --overlay-script ./scripts/create_overlay_final.py --seg-base segmentation/mesmer{tma_flag}\n'
             + 'conda deactivate\n'
             + 'mv segmentation segmentation_wc; mv qc_overlays_segmentation-mesmer qc_overlays_wc\n'
             + 'nextflow run labsyspharm/mcmicro --in . -profile singularity -params-file params-nuc.yml\n'
             + f'source activate "${{QC_ENV_DC}}"\n'
-            + f'bash ./scripts/run_overlay_qc.sh --base-dir . --nuc-channel {nuc_idx} --cyto-channel {cyto_idx} --overlay-script ./scripts/create_overlay_final.py --seg-base segmentation/mesmer{tma_flag}\n'
+            + f'bash ./scripts/run_overlay_qc.sh --base-dir . --nuc-channel {nuc_idx} --cyto-channel "{cyto_idx_str}" --overlay-script ./scripts/create_overlay_final.py --seg-base segmentation/mesmer{tma_flag}\n'
             + 'conda deactivate\n'
             + 'for dir in segmentation/mesmer-*; do mv "$dir/cell.tif" "$dir/nuclear.tif" 2>/dev/null; done\n'
             + 'mv segmentation segmentation_nuc; mv qc_overlays_segmentation-mesmer qc_overlays_nuc\n'
