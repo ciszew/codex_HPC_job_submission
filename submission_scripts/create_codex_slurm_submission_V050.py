@@ -653,6 +653,17 @@ options:
   mesmer: --image-mpp {IMAGE_MPP} --compartment {compartment}
 """
 
+def get_params_quant_yml(is_tma):
+    tma_str = 'true' if is_tma else 'false'
+    return f"""
+workflow:
+  background: true
+  tma: {tma_str}
+  start-at: quantification
+  stop-at: quantification
+options:
+  mcquant: --masks cell.tif nuclear.tif --intensity_props intensity_median
+"""
 
 # ==============================================================================
 # --- SLURM ORCHESTRATION ---
@@ -799,7 +810,7 @@ if __name__ == "__main__":
         os.path.join(scratch_run_dir, 'params-preprocess.yml'): get_params_preprocess_yml(IS_TMA_WORKFLOW),
         os.path.join(scratch_run_dir, 'params-wc.yml'): get_params_analysis_yml(IS_TMA_WORKFLOW, 'whole-cell', nuc_idx, memb_indices),
         os.path.join(scratch_run_dir, 'params-nuc.yml'): get_params_analysis_yml(IS_TMA_WORKFLOW, 'nuclear', nuc_idx, memb_indices),
-        os.path.join(scratch_run_dir, 'params-quant.yml'): "workflow:\n  background: true\n  tma: true\n  start-at: quantification\n  stop-at: quantification\noptions:\n  mcquant: --masks cell.tif nuclear.tif --intensity_props intensity_median"
+        os.path.join(scratch_run_dir, 'params-quant.yml'): get_params_quant_yml(IS_TMA_WORKFLOW)
     }
 
     if not args.dry_run:
